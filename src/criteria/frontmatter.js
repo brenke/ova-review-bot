@@ -161,6 +161,7 @@ export function normalizeCriteriaConfig(data) {
     forbiddenPlaceholders: asArray(data.forbidden_placeholders),
     forbiddenPhrases: asArray(data.forbidden_phrases),
     numericFields: asArray(data.numeric_fields),
+    lore: asArray(data.lore),
     allowEmptyFields: asArray(data.allow_empty_fields),
     nonBlockingSections: [
       ...asArray(data.non_blocking_sections),

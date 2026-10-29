@@ -53,7 +53,7 @@ export function todayRu() {
   return `${day}.${month}.${now.getUTCFullYear()}`;
 }
 
-export function buildMessages({ docText, criteria, detResult, docMeta }) {
+export function buildMessages({ docText, criteria, detResult, docMeta, loreText }) {
   const today = todayRu();
   const findings = detResult.findings.length
     ? detResult.findings
@@ -82,7 +82,15 @@ ${findings}
 ## Найденные разделы
 ${sections}
 
-## Проверяемый документ
+${loreText ? `## Лор проекта (краткая справка)
+Сверяй факты из досье с этим лором. Если персонаж, событие, город или
+подразделение противоречат лору — замечание severity "major" с указанием, что
+именно не сходится. Если в досье упомянута структура из раздела «Секретные
+структуры» — severity "critical": сотрудник не может о ней знать.
+
+${loreText}
+
+` : ''}## Проверяемый документ
 <<<ДОКУМЕНТ
 ${docText}
 ДОКУМЕНТ>>>`;
@@ -100,12 +108,12 @@ function sleep(ms) {
 /**
  * @param {{docText: string, criteria: object, detResult: object, docMeta: object, model?: string}} input
  */
-export async function reviewWithLlm({ docText, criteria, detResult, docMeta, model }) {
+export async function reviewWithLlm({ docText, criteria, detResult, docMeta, model, loreText }) {
   if (!llmConfigured) return null;
 
   const url = `${config.llm.baseUrl}/chat/completions`;
   const modelName = model || criteria.config.model || config.llm.model;
-  const messages = buildMessages({ docText, criteria, detResult, docMeta });
+  const messages = buildMessages({ docText, criteria, detResult, docMeta, loreText });
 
   let useJsonMode = true;
   let lastError;

@@ -85,6 +85,7 @@ export const paths = {
   criteria: path.join(config.review.dataDir, 'criteria'),
   criteriaHistory: path.join(config.review.dataDir, 'criteria', '.history'),
   reports: path.join(config.review.dataDir, 'reports'),
+  lore: path.join(config.review.dataDir, 'lore'),
 };
 
 /** Есть ли чем обращаться к модели. */

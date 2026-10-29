@@ -19,10 +19,8 @@ export const SEVERITY_LABEL = {
   minor: 'мелочь',
 };
 
-const TEMPLATE_MARKERS = [
+const TEMPLATE_HINTS = [
   { re: /lorem\s+ipsum/i, text: '«Lorem ipsum» — заготовка вместо текста' },
-  { re: /v{8,}/i, text: 'артефакт шаблона — дорожка из букв «v»' },
-  { re: /x{5,}/i, text: 'артефакт шаблона — «xxxx»' },
   { re: /заполни(те)?\s+здесь/i, text: 'подсказка шаблона «заполните здесь»' },
   { re: /\[вставьте[^\]]*\]/i, text: 'подсказка шаблона «[вставьте …]»' },
 ];
@@ -299,8 +297,8 @@ export function runChecks({ parsed, criteria, steamId }) {
     );
   }
 
-  // ── артефакты шаблона ─────────────────────────────────────────────────────
-  for (const marker of TEMPLATE_MARKERS) {
+  // ── артефакты шаблона (видимый текст: заготовки и подсказки) ─────────────
+  for (const marker of TEMPLATE_HINTS) {
     if (marker.re.test(parsed.text)) {
       push(findings, 'TEMPLATE_MARKER', 'minor', 'Следы шаблона', marker.text);
     }

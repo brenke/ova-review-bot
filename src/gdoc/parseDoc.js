@@ -73,6 +73,8 @@ export function normalizeText(raw) {
     .replace(/\r\n?/g, '\n')
     .replace(/\u00a0/g, ' ')
     .replace(/\t{2,}/g, '\t')
+    // Технические дорожки вида «vvvvvv» / «xxxxx» — не текст документа
+    .replace(/([A-Za-zА-Яа-яЁё])\1{5,}/g, ' ')
     .replace(/[ ]+\n/g, '\n')
     .replace(/\n{3,}/g, '\n\n')
     .trim();

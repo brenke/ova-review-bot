@@ -1,16 +1,10 @@
-import {
-  ActionRowBuilder,
-  ButtonBuilder,
-  ButtonStyle,
-  MessageFlags,
-} from 'discord.js';
-
-import { PermissionFlagsBits } from 'discord.js';
+import { MessageFlags, PermissionFlagsBits } from 'discord.js';
 
 import { config } from '../config.js';
 import { createLogger } from '../logger.js';
 import { runReview } from '../review/runReview.js';
 import { extractSteamId, findDocLinkInChannel } from './findDocLink.js';
+import { buildReportMessage, buildStatusMessage } from './reportView.js';
 
 const log = createLogger('review');
 
@@ -25,6 +19,15 @@ function canRunReview(interaction) {
   return roleIds.some((roleId) => interaction.member?.roles?.cache?.has(roleId));
 }
 
+/** Reply со статусом в формате Components V2 (+ эфемерность при необходимости). */
+function statusReply(text, ephemeral = false) {
+  const payload = buildStatusMessage(text);
+  return {
+    ...payload,
+    flags: payload.flags | (ephemeral ? MessageFlags.Ephemeral : 0),
+  };
+}
+
 export async function handleReviewCommand(interaction) {
   if (!canRunReview(interaction)) {
     await interaction.reply({
@@ -37,15 +40,16 @@ export async function handleReviewCommand(interaction) {
   const silent = interaction.options.getBoolean('silent') ?? false;
   const criteriaName = interaction.options.getString('criteria') ?? undefined;
 
-  await interaction.deferReply({ ephemeral: silent });
-  await interaction.editReply({ content: '⏳ Ищу ссылку на документ в этом канале…' });
+  await interaction.reply(statusReply('⏳ Ищу ссылку на документ в этом канале…', silent));
 
   const target = await findDocLinkInChannel(interaction.channel);
   if (!target) {
-    await interaction.editReply({
-      content:
+    await interaction.editReply(
+      buildStatusMessage(
         'Не нашёл ссылку на Google Документ. Пришли ссылку сообщением в этот топик (или отдельным сообщением в канал) и вызови `/review` снова.',
-    });
+        0xed4245,
+      ),
+    );
     return;
   }
 
@@ -67,7 +71,7 @@ export async function handleReviewButton(interaction) {
 
   // Если исходный отчёт был «только для себя» — новый тоже делаем приватным
   const ephemeral = interaction.message?.flags?.has(MessageFlags.Ephemeral) ?? false;
-  await interaction.deferReply({ ephemeral });
+  await interaction.reply(statusReply('⏳ Перепроверяю документ…', ephemeral));
 
   const url =
     kind === 'e'
@@ -97,13 +101,13 @@ export async function handleReviewButton(interaction) {
 async function reviewAndReply({ interaction, url, criteriaName, steamId, sourceNote, deletePrevious }) {
   const lockKey = `${interaction.guildId ?? 'dm'}:${url}`;
   if (inFlight.has(lockKey)) {
-    await interaction.editReply({ content: 'Этот документ уже проверяется, подожди немного.' });
+    await interaction.editReply(buildStatusMessage('Этот документ уже проверяется, подожди немного.', 0xf1c40f));
     return;
   }
   inFlight.add(lockKey);
 
   try {
-    await interaction.editReply({ content: `⏳ Проверяю документ (${sourceNote})…` });
+    await interaction.editReply(buildStatusMessage(`⏳ Проверяю документ (${sourceNote})…`));
 
     let lastUpdate = 0;
     const onProgress = async (message) => {
@@ -111,25 +115,18 @@ async function reviewAndReply({ interaction, url, criteriaName, steamId, sourceN
       const now = Date.now();
       if (now - lastUpdate < 1200) return;
       lastUpdate = now;
-      await interaction.editReply({ content: `⏳ ${message}` }).catch(() => {});
+      await interaction.editReply(buildStatusMessage(`⏳ ${message}`)).catch(() => {});
     };
 
     const result = await runReview({ docUrl: url, criteriaName, steamId, onProgress });
     const { report, doc, criteria, detResult, llm, llmError } = result;
 
-    const row = new ActionRowBuilder().addComponents(
-      new ButtonBuilder()
-        .setCustomId(`review:again:${doc.published ? 'e' : 'd'}:${doc.docId}`)
-        .setLabel('Перепроверить')
-        .setEmoji('🔁')
-        .setStyle(ButtonStyle.Secondary),
+    await interaction.editReply(
+      buildReportMessage(report.view, {
+        docId: doc.docId,
+        kind: doc.published ? 'published' : 'regular',
+      }),
     );
-
-    await interaction.editReply({
-      content: `📄 Документ: ${doc.url}`,
-      embeds: [report.embed],
-      components: [row],
-    });
 
     // При перепроверке убираем старое сообщение — остаётся только свежий отчёт.
     if (deletePrevious) {
@@ -144,7 +141,7 @@ async function reviewAndReply({ interaction, url, criteriaName, steamId, sourceN
   } catch (error) {
     log.error('Ошибка проверки:', error);
     await interaction
-      .editReply({ content: `❌ ${error?.message ?? 'Не удалось проверить документ'}` })
+      .editReply(buildStatusMessage(`❌ ${error?.message ?? 'Не удалось проверить документ'}`, 0xed4245))
       .catch(() => {});
   } finally {
     inFlight.delete(lockKey);

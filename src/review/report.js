@@ -13,8 +13,8 @@ export const VERDICTS = {
   reject: { label: '⛔ Отклонить', plain: 'Отклонить', color: 0xe74c3c },
 };
 
-const SEVERITY_ICON = { critical: '🔴', major: '🟠', minor: '🟡' };
-const SEVERITY_TITLE = { critical: 'Критично', major: 'Важно', minor: 'Мелочи' };
+const SEVERITY_ICON = { critical: '🔴', major: '🟠', minor: '🟡', info: 'ℹ️' };
+const SEVERITY_TITLE = { critical: 'Критично', major: 'Важно', minor: 'Мелочи', info: 'К сведению' };
 const STATUS_ICON = { pass: '✅', warn: '⚠️', fail: '❌' };
 
 function truncate(text, max) {
@@ -70,15 +70,18 @@ export function buildReport({ doc, parsed, criteria, detResult, llm, llmError })
     ...(llm?.issues ?? []),
     ...autoFindingsAsIssues(detResult.findings),
   ].sort((a, b) => {
-    const order = { critical: 0, major: 1, minor: 2 };
-    return (order[a.severity] ?? 3) - (order[b.severity] ?? 3);
+    const order = { critical: 0, major: 1, minor: 2, info: 3 };
+    return (order[a.severity] ?? 4) - (order[b.severity] ?? 4);
   });
 
+  const blocking = detResult.counts.critical + detResult.counts.major;
   const summaryText =
     llm?.summary ||
-    (detResult.findings.length
-      ? `Автопроверки нашли ${detResult.findings.length} замечани(й). ИИ-проверка не выполнялась.`
-      : 'Автопроверки не нашли проблем. ИИ-проверка не выполнялась.');
+    (blocking > 0
+      ? `Автопроверки: ${detResult.counts.critical} критичных, ${detResult.counts.major} важных, ${detResult.counts.minor} мелочей, ${detResult.counts.info} пометок для ревьюера. ИИ-проверка не выполнялась.`
+      : detResult.counts.info > 0
+        ? `Блокирующих проблем нет. Пометок для ревьюера: ${detResult.counts.info}, мелочей: ${detResult.counts.minor}. ИИ-проверка не выполнялась.`
+        : 'Автопроверки не нашли проблем. ИИ-проверка не выполнялась.');
 
   // ── embed ─────────────────────────────────────────────────────────────────
   const embed = new EmbedBuilder()
@@ -94,7 +97,7 @@ export function buildReport({ doc, parsed, criteria, detResult, llm, llmError })
       },
       {
         name: 'Автопроверки',
-        value: `${SEVERITY_ICON.critical} ${detResult.counts.critical} · ${SEVERITY_ICON.major} ${detResult.counts.major} · ${SEVERITY_ICON.minor} ${detResult.counts.minor}`,
+        value: `${SEVERITY_ICON.critical} ${detResult.counts.critical} · ${SEVERITY_ICON.major} ${detResult.counts.major} · ${SEVERITY_ICON.minor} ${detResult.counts.minor}${detResult.counts.info ? ` · ${SEVERITY_ICON.info} ${detResult.counts.info}` : ''}`,
         inline: true,
       },
       {
@@ -107,7 +110,7 @@ export function buildReport({ doc, parsed, criteria, detResult, llm, llmError })
       },
     );
 
-  const criticalAndMajor = allIssues.filter((i) => i.severity !== 'minor');
+  const criticalAndMajor = allIssues.filter((i) => i.severity === 'critical' || i.severity === 'major');
   if (criticalAndMajor.length) {
     embed.addFields({
       name: 'Главные замечания',
@@ -121,17 +124,21 @@ export function buildReport({ doc, parsed, criteria, detResult, llm, llmError })
     });
   }
 
+  const notes = allIssues.filter((i) => i.severity === 'info');
+  if (notes.length) {
+    embed.addFields({
+      name: `${SEVERITY_ICON.info} К сведению (без штрафа)`,
+      value: truncate(
+        notes.slice(0, 5).map((i) => `• **${i.where || 'Документ'}** — ${i.problem}`).join('\n'),
+        1000,
+      ),
+    });
+  }
+
   if (llm?.strengths?.length) {
     embed.addFields({
       name: 'Что хорошо',
       value: truncate(llm.strengths.slice(0, 4).map((s) => `• ${s}`).join('\n'), 1000),
-    });
-  }
-
-  if (llm?.questions?.length) {
-    embed.addFields({
-      name: 'Уточнить у автора',
-      value: truncate(llm.questions.slice(0, 4).map((s) => `• ${s}`).join('\n'), 1000),
     });
   }
 
@@ -183,7 +190,7 @@ export function buildReport({ doc, parsed, criteria, detResult, llm, llmError })
 
   if (allIssues.length) {
     lines.push('## Замечания');
-    for (const severity of ['critical', 'major', 'minor']) {
+    for (const severity of ['critical', 'major', 'minor', 'info']) {
       const group = allIssues.filter((i) => i.severity === severity);
       if (!group.length) continue;
       lines.push('');
@@ -233,13 +240,6 @@ export function buildReport({ doc, parsed, criteria, detResult, llm, llmError })
     lines.push('## Что хорошо');
     lines.push('');
     for (const item of llm.strengths) lines.push(`- ${item}`);
-    lines.push('');
-  }
-
-  if (llm?.questions?.length) {
-    lines.push('## Уточнить у автора');
-    lines.push('');
-    for (const item of llm.questions) lines.push(`- ${item}`);
     lines.push('');
   }
 

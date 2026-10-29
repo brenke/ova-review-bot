@@ -4,6 +4,7 @@ import { config } from './config.js';
 import { listCriteria, ensureDirs } from './criteria/store.js';
 import { commands } from './discord/commands.js';
 import { handleCriteriaCommand } from './discord/criteriaCommand.js';
+import { handleInfoCommand } from './discord/infoCommand.js';
 import { handleReviewButton, handleReviewCommand } from './discord/reviewCommand.js';
 import { createLogger } from './logger.js';
 import { llmInfo } from './review/llm.js';
@@ -67,6 +68,8 @@ function attachHandlers(client) {
         await handleReviewCommand(interaction);
       } else if (interaction.commandName === 'criteria') {
         await handleCriteriaCommand(interaction);
+      } else if (interaction.commandName === 'info') {
+        await handleInfoCommand(interaction);
       }
     } catch (error) {
       log.error(`Ошибка обработки ${interaction.commandName ?? interaction.customId}:`, error);

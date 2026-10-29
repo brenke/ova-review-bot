@@ -17,6 +17,10 @@ const SYSTEM_PROMPT = `Ты — старший проверяющий анкет
 - Критично: пустые обязательные разделы, прочерки вместо биографии, богмод и «суперспособности», копипаста шаблона или чужих анкет, нарушения лора, метагейминг в описании.
 - Важно: противоречия между разделами (возраст ↔ год рождения, должность ↔ опыт), отсутствие мотивации и слабостей, слишком общие формулировки («добрый, умный, смелый»).
 - Мелочь: опечатки, стиль, оформление.
+- Если биография или психологический портрет не заполнены — это НЕ повод снижать
+  оценку: помечай такие пункты как "info" (к сведению), чтобы ревьюер обратил
+  внимание. Но если биография написана плохо (бред, микро-текст на три строки,
+  нелорные события, противоречия) — это уже "major".
 - Пиши по-русски, кратко и предметно: что не так и что конкретно исправить. Ссылайся на разделы документа.
 - В запросе уже есть список того, что нашли автопроверки. Не повторяй эти пункты — дополняй их смысловыми замечаниями, которые нельзя проверить формально.
 
@@ -26,9 +30,8 @@ const SYSTEM_PROMPT = `Ты — старший проверяющий анкет
   "score": 0-100,
   "summary": "1-3 предложения с общим выводом",
   "criteria": [{ "name": "пункт чек-листа", "status": "pass" | "warn" | "fail", "comment": "коротко" }],
-  "issues": [{ "severity": "critical" | "major" | "minor", "where": "раздел документа", "problem": "в чём проблема", "fix": "что сделать" }],
-  "strengths": ["что получилось хорошо"],
-  "questions": ["что стоит уточнить у автора"]
+  "issues": [{ "severity": "critical" | "major" | "minor" | "info", "where": "раздел документа", "problem": "в чём проблема", "fix": "что сделать" }],
+  "strengths": ["что получилось хорошо"]
 }
 Правила вердикта: accept — можно принимать как есть, rework — нужны правки, reject — анкета не соответствует правилам по существу.`;
 
@@ -207,7 +210,7 @@ function normalizeResult(raw) {
   const issues = Array.isArray(raw?.issues)
     ? raw.issues
         .map((item) => ({
-          severity: ['critical', 'major', 'minor'].includes(asString(item?.severity).toLowerCase())
+          severity: ['critical', 'major', 'minor', 'info'].includes(asString(item?.severity).toLowerCase())
             ? asString(item.severity).toLowerCase()
             : 'major',
           where: asString(item?.where ?? item?.section ?? item?.location),
@@ -218,7 +221,6 @@ function normalizeResult(raw) {
     : [];
 
   const strengths = Array.isArray(raw?.strengths) ? raw.strengths.map(asString).filter(Boolean) : [];
-  const questions = Array.isArray(raw?.questions) ? raw.questions.map(asString).filter(Boolean) : [];
 
   const scoreNumber = Number(raw?.score);
   const score = Number.isFinite(scoreNumber) ? Math.max(0, Math.min(100, Math.round(scoreNumber))) : 50;
@@ -230,6 +232,5 @@ function normalizeResult(raw) {
     criteria,
     issues,
     strengths,
-    questions,
   };
 }

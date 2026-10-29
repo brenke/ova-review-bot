@@ -163,7 +163,10 @@ export function normalizeCriteriaConfig(data) {
     forbiddenPhrases: asArray(data.forbidden_phrases),
     numericFields: asArray(data.numeric_fields),
     allowEmptyFields: asArray(data.allow_empty_fields),
-    softSections: asArray(data.soft_sections),
+    nonBlockingSections: [
+      ...asArray(data.non_blocking_sections),
+      ...asArray(data.soft_sections), // старый ключ, оставлен для совместимости
+    ].filter((value, index, list) => list.indexOf(value) === index),
     minWords,
     minSectionWords: Number.isFinite(Number(checks.min_section_words))
       ? Number(checks.min_section_words)

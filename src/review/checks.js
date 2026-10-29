@@ -19,7 +19,7 @@ export const SEVERITY_LABEL = {
   minor: 'мелочь',
 };
 
-const SEVERITY_WEIGHT = { critical: 25, major: 8, minor: 2 };
+const SEVERITY_WEIGHT = { critical: 25, major: 8, minor: 2, info: 0 };
 
 const TEMPLATE_MARKERS = [
   { re: /lorem\s+ipsum/i, text: '«Lorem ipsum» — заготовка вместо текста' },
@@ -48,19 +48,27 @@ export function runChecks({ parsed, criteria }) {
   /** @type {Array<{code: string, severity: 'critical'|'major'|'minor', title: string, detail: string, where?: string}>} */
   const findings = [];
   const placeholders = cfg.forbiddenPlaceholders ?? [];
+  const nonBlocking = (cfg.nonBlockingSections ?? []).map(normalizeKey);
+  const isNonBlocking = (aliases) =>
+    nonBlocking.length > 0 &&
+    aliases.some((alias) => nonBlocking.includes(normalizeKey(alias)));
 
   // ── разделы ───────────────────────────────────────────────────────────────
   for (const spec of cfg.requiredSections ?? []) {
     const aliases = aliasList(spec);
     const section = findSection(parsed, ...aliases);
+    const skipPenalty = isNonBlocking(aliases);
+
     if (!section) {
       push(
         findings,
         'MISSING_SECTION',
-        'critical',
-        `Нет раздела «${aliases[0]}»`,
-        `В документе не найден обязательный раздел. Искал: ${aliases.join(', ')}.`,
-        { where: aliases[0] },
+        skipPenalty ? 'info' : 'critical',
+        skipPenalty ? `Раздел «${aliases[0]}» не заполнен` : `Нет раздела «${aliases[0]}»`,
+        skipPenalty
+          ? 'Раздел необязателен: баллы не снимаются, но ревьюеру стоит обратить внимание.'
+          : `В документе не найден обязательный раздел. Искал: ${aliases.join(', ')}.`,
+        { where: aliases[0], note: skipPenalty },
       );
       continue;
     }
@@ -76,28 +84,24 @@ export function runChecks({ parsed, criteria }) {
       .filter((line) => /[-–—_]/.test(line)).length;
 
     if (minWords > 0 && section.words < minWords) {
-      const soft = (cfg.softSections ?? []).some((name) =>
-        aliases.some((alias) => normalizeKey(alias) === normalizeKey(name)),
-      );
       push(
         findings,
         'EMPTY_SECTION',
-        soft || section.words >= Math.max(5, minWords * 0.5) ? 'major' : 'critical',
-        `Раздел «${section.title}» почти пустой`,
+        skipPenalty ? 'info' : section.words >= Math.max(5, minWords * 0.5) ? 'major' : 'critical',
+        skipPenalty
+          ? `Раздел «${section.title}» почти не заполнен`
+          : `Раздел «${section.title}» почти пустой`,
         `Слов: ${section.words}, минимум по чек-листу: ${minWords}.${dashLines ? ` Прочерков вместо текста: ${dashLines}.` : ''}`,
-        { where: section.title },
+        { where: section.title, note: skipPenalty },
       );
     } else if (dashLines >= 2) {
-      const soft = (cfg.softSections ?? []).some((name) =>
-        aliases.some((alias) => normalizeKey(alias) === normalizeKey(name)),
-      );
       push(
         findings,
         'SECTION_DASHES',
-        soft ? 'major' : 'critical',
+        skipPenalty ? 'info' : 'critical',
         `Раздел «${section.title}» заполнен прочерками`,
         `Прочерков вместо содержания: ${dashLines}.`,
-        { where: section.title },
+        { where: section.title, note: skipPenalty },
       );
     }
   }
@@ -343,8 +347,10 @@ export function runChecks({ parsed, criteria }) {
       critical: findings.filter((f) => f.severity === 'critical').length,
       major: findings.filter((f) => f.severity === 'major').length,
       minor: findings.filter((f) => f.severity === 'minor').length,
+      info: findings.filter((f) => f.severity === 'info').length,
     },
     hasCritical: findings.some((f) => f.severity === 'critical'),
+    hasNotes: findings.some((f) => f.severity === 'info'),
     stats: parsed.stats,
   };
 }

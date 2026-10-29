@@ -66,4 +66,8 @@ export const criteriaCommand = new SlashCommandBuilder()
       ),
   );
 
-export const commands = [reviewCommand, criteriaCommand];
+export const infoCommand = new SlashCommandBuilder()
+  .setName('info')
+  .setDescription('Справка: какие команды есть и как читать отчёт');
+
+export const commands = [reviewCommand, criteriaCommand, infoCommand];

@@ -1,6 +1,5 @@
 import {
   ActionRowBuilder,
-  AttachmentBuilder,
   ButtonBuilder,
   ButtonStyle,
 } from 'discord.js';
@@ -112,10 +111,6 @@ async function reviewAndReply({ interaction, url, criteriaName, criteriaOverride
     const result = await runReview({ docUrl: url, criteriaName, criteria: criteriaOverride, onProgress });
     const { report, doc, criteria, detResult, llm, llmError } = result;
 
-    const attachment = new AttachmentBuilder(Buffer.from(report.markdown, 'utf8'), {
-      name: report.fileName,
-    });
-
     const row = new ActionRowBuilder().addComponents(
       new ButtonBuilder()
         .setCustomId(`review:again:${doc.published ? 'e' : 'd'}:${doc.docId}`)
@@ -127,12 +122,11 @@ async function reviewAndReply({ interaction, url, criteriaName, criteriaOverride
     await interaction.editReply({
       content: `📄 Документ: ${doc.url}\n🧾 Чек-лист: **${criteria.name}**`,
       embeds: [report.embed],
-      files: [attachment],
       components: [row],
     });
 
     log.info(
-      `Проверка ${doc.docId}: ${report.score}/100, замечаний: ${detResult.findings.length}, чек-лист ${criteria.slug} (${criteria.updatedAt?.toISOString().slice(0, 16) ?? '—'}), ИИ: ${llm ? 'да' : llmError ? 'ошибка' : 'нет'}`,
+      `Проверка ${doc.docId}: замечаний ${detResult.findings.length} (🔴 ${detResult.counts.critical}, 🟠 ${detResult.counts.major}, 🟡 ${detResult.counts.minor}, ℹ️ ${detResult.counts.info}), чек-лист ${criteria.slug} (${criteria.updatedAt?.toISOString().slice(0, 16) ?? '—'}), ИИ: ${llm ? 'да' : llmError ? 'ошибка' : 'нет'}`,
     );
   } catch (error) {
     log.error('Ошибка проверки:', error);

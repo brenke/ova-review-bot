@@ -19,8 +19,6 @@ export const SEVERITY_LABEL = {
   minor: 'мелочь',
 };
 
-const SEVERITY_WEIGHT = { critical: 25, major: 8, minor: 2, info: 0 };
-
 const TEMPLATE_MARKERS = [
   { re: /lorem\s+ipsum/i, text: '«Lorem ipsum» — заготовка вместо текста' },
   { re: /v{8,}/i, text: 'артефакт шаблона — дорожка из букв «v»' },
@@ -336,21 +334,14 @@ export function runChecks({ parsed, criteria }) {
     }
   }
 
-  // ── итоговый балл ─────────────────────────────────────────────────────────
-  const penalty = findings.reduce((sum, item) => sum + (SEVERITY_WEIGHT[item.severity] ?? 0), 0);
-  const score = Math.max(0, Math.min(100, 100 - penalty));
-
   return {
     findings,
-    score,
     counts: {
       critical: findings.filter((f) => f.severity === 'critical').length,
       major: findings.filter((f) => f.severity === 'major').length,
       minor: findings.filter((f) => f.severity === 'minor').length,
       info: findings.filter((f) => f.severity === 'info').length,
     },
-    hasCritical: findings.some((f) => f.severity === 'critical'),
-    hasNotes: findings.some((f) => f.severity === 'info'),
     stats: parsed.stats,
   };
 }

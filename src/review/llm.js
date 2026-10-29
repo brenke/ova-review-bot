@@ -14,25 +14,25 @@ const SYSTEM_PROMPT = `Ты — старший проверяющий анкет
 
 Принципы:
 - Замечание уместно, если оно реально мешает игре, ломает лор или нарушает правило из чек-листа. Не придумывай придирок.
+- Текущую дату бери только из задания. Не полагайся на свои знания о «сегодня» и не считай прошедшие даты будущими.
 - Критично: пустые обязательные разделы, прочерки вместо биографии, богмод и «суперспособности», копипаста шаблона или чужих анкет, нарушения лора, метагейминг в описании.
 - Важно: противоречия между разделами (возраст ↔ год рождения, должность ↔ опыт), отсутствие мотивации и слабостей, слишком общие формулировки («добрый, умный, смелый»).
 - Мелочь: опечатки, стиль, оформление.
-- Если биография или психологический портрет не заполнены — это НЕ повод снижать
-  оценку: помечай такие пункты как "info" (к сведению), чтобы ревьюер обратил
-  внимание. Но если биография написана плохо (бред, микро-текст на три строки,
-  нелорные события, противоречия) — это уже "major".
+- Если биография или психологический портрет не заполнены — это не замечание:
+  помечай такие пункты как "info" (к сведению), чтобы ревьюер обратил внимание.
+  Но если биография написана плохо (бред, микро-текст на три строки, нелорные
+  события, противоречия) — это уже "major".
 - Пиши по-русски, кратко и предметно: что не так и что конкретно исправить. Ссылайся на разделы документа.
 - В запросе уже есть список того, что нашли автопроверки. Не повторяй эти пункты — дополняй их смысловыми замечаниями, которые нельзя проверить формально.
 
 Формат ответа (строго):
 {
-  "score": 0-100,
   "summary": "1-3 предложения с общим выводом",
   "criteria": [{ "name": "пункт чек-листа", "status": "pass" | "warn" | "fail", "comment": "коротко" }],
   "issues": [{ "severity": "critical" | "major" | "minor" | "info", "where": "раздел документа", "problem": "в чём проблема", "fix": "что сделать" }],
   "strengths": ["что получилось хорошо"]
 }
-Не выноси вердикт и не советуй «принять / отклонить» — только факты, оценка и замечания. Решение принимает проверяющий.`;
+Не выставляй числовых оценок и не выноси вердикт («принять / отклонить») — только факты и замечания. Решение принимает проверяющий.`;
 
 export function isLlmConfigured() {
   return llmConfigured;
@@ -42,7 +42,19 @@ export function llmInfo() {
   return { configured: llmConfigured, model: config.llm.model, baseUrl: config.llm.baseUrl };
 }
 
-function buildMessages({ docText, criteria, detResult, docMeta }) {
+/**
+ * Текущая дата в формате ДД.ММ.ГГГГ. Модель не знает сегодняшнюю дату, поэтому
+ * её надо передавать явно — иначе она считает прошлые события будущими.
+ */
+export function todayRu() {
+  const now = new Date();
+  const day = String(now.getUTCDate()).padStart(2, '0');
+  const month = String(now.getUTCMonth() + 1).padStart(2, '0');
+  return `${day}.${month}.${now.getUTCFullYear()}`;
+}
+
+export function buildMessages({ docText, criteria, detResult, docMeta }) {
+  const today = todayRu();
   const findings = detResult.findings.length
     ? detResult.findings
         .map((f) => `- [${f.severity}] ${f.title}: ${String(f.detail).replace(/\n/g, ' ')}`)
@@ -53,7 +65,11 @@ function buildMessages({ docText, criteria, detResult, docMeta }) {
     ? detResult.stats.headings.map((title, i) => `${i + 1}. ${title}`).join('\n')
     : '- заголовки не распознаны';
 
-  const user = `## Чек-лист сервера: ${criteria.name}
+  const user = `## Текущая дата
+Сегодня — ${today} (UTC). Всё, что раньше этой даты, уже произошло; позже — будущее.
+Поле «Действительно до» по шаблону сервера — 01.08.2035: дата в будущем там нормальна, это не ошибка.
+
+## Чек-лист сервера: ${criteria.name}
 ${criteria.description ? `_${criteria.description}_\n` : ''}
 ${criteria.body}
 
@@ -212,11 +228,7 @@ function normalizeResult(raw) {
 
   const strengths = Array.isArray(raw?.strengths) ? raw.strengths.map(asString).filter(Boolean) : [];
 
-  const scoreNumber = Number(raw?.score);
-  const score = Number.isFinite(scoreNumber) ? Math.max(0, Math.min(100, Math.round(scoreNumber))) : 50;
-
   return {
-    score,
     summary: asString(raw?.summary),
     criteria,
     issues,

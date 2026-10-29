@@ -1,6 +1,6 @@
 /**
- * Собирает отчёт: короткий embed для Discord и подробный .md-файл.
- * Вердикт бот не выносит — только факты, оценка и замечания.
+ * Собирает отчёт: короткий embed для Discord и подробный .md-файл (для CLI).
+ * Никаких оценок и вердиктов — только факты и замечания.
  */
 
 import { EmbedBuilder } from 'discord.js';
@@ -16,11 +16,6 @@ function truncate(text, max) {
   const value = String(text ?? '').trim();
   if (value.length <= max) return value;
   return `${value.slice(0, Math.max(0, max - 1)).trimEnd()}…`;
-}
-
-function scoreBar(score) {
-  const filled = Math.max(0, Math.min(10, Math.round(score / 10)));
-  return `${'█'.repeat(filled)}${'░'.repeat(10 - filled)}`;
 }
 
 function personName(parsed) {
@@ -41,10 +36,6 @@ function autoFindingsAsIssues(findings) {
 }
 
 export function buildReport({ doc, parsed, criteria, detResult, llm, llmError }) {
-  const detScore = detResult.score;
-  const aiScore = llm?.score ?? null;
-  const score = aiScore === null ? detScore : Math.round(detScore * 0.5 + aiScore * 0.5);
-
   const name = personName(parsed);
 
   const allIssues = [
@@ -71,11 +62,6 @@ export function buildReport({ doc, parsed, criteria, detResult, llm, llmError })
     .setURL(doc.url)
     .setDescription(truncate(summaryText, 1200))
     .addFields(
-      {
-        name: 'Оценка',
-        value: `\`${scoreBar(score)}\` **${score}/100**`,
-        inline: true,
-      },
       {
         name: 'Автопроверки',
         value: `${SEVERITY_ICON.critical} ${detResult.counts.critical} · ${SEVERITY_ICON.major} ${detResult.counts.major} · ${SEVERITY_ICON.minor} ${detResult.counts.minor}${detResult.counts.info ? ` · ${SEVERITY_ICON.info} ${detResult.counts.info}` : ''}`,
@@ -108,7 +94,7 @@ export function buildReport({ doc, parsed, criteria, detResult, llm, llmError })
   const notes = allIssues.filter((i) => i.severity === 'info');
   if (notes.length) {
     embed.addFields({
-      name: `${SEVERITY_ICON.info} К сведению (без штрафа)`,
+      name: `${SEVERITY_ICON.info} К сведению`,
       value: truncate(
         notes.slice(0, 5).map((i) => `• **${i.where || 'Документ'}** — ${i.problem}`).join('\n'),
         1000,
@@ -137,7 +123,9 @@ export function buildReport({ doc, parsed, criteria, detResult, llm, llmError })
     : '';
   embed.setFooter({
     text: truncate(
-      `Автопроверки: ${detScore}/100${aiScore !== null ? ` · ИИ (${llm?.model ?? criteria.config.model ?? 'модель'}): ${aiScore}/100` : ''}${criteriaStamp ? ` · чек-лист от ${criteriaStamp}` : ''}`,
+      [`${criteria.slug}${criteria.version ? ` · v${criteria.version}` : ''}`, criteriaStamp ? `обновлён ${criteriaStamp}` : '']
+        .filter(Boolean)
+        .join(' · '),
       200,
     ),
   });
@@ -149,7 +137,6 @@ export function buildReport({ doc, parsed, criteria, detResult, llm, llmError })
 
   lines.push('# Проверка документа');
   lines.push('');
-  lines.push(`**Оценка:** ${score}/100${aiScore !== null ? ` (автопроверки ${detScore}, ИИ ${aiScore})` : ' (только автопроверки)'}`);
   lines.push(`**Чек-лист:** ${criteria.name} (\`${criteria.slug}\`${criteria.version ? `, v${criteria.version}` : ''})`);
   if (criteria.updatedAt) {
     lines.push(`**Файл чек-листа обновлён:** ${criteria.updatedAt.toISOString().replace('T', ' ').slice(0, 16)} UTC`);
@@ -239,9 +226,6 @@ export function buildReport({ doc, parsed, criteria, detResult, llm, llmError })
 
   return {
     color: REPORT_COLOR,
-    score,
-    detScore,
-    aiScore,
     embed,
     markdown,
     fileName: `review-${safeName}.md`,

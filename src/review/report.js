@@ -99,7 +99,10 @@ export function buildReport({ doc, parsed, criteria, detResult, llm, llmError })
       },
       {
         name: 'Чек-лист',
-        value: truncate(`${criteria.name}\n\`${criteria.slug}\``, 100),
+        value: truncate(
+          `${criteria.name}\n\`${criteria.slug}\`${criteria.version ? ` · v${criteria.version}` : ''}`,
+          100,
+        ),
         inline: true,
       },
     );
@@ -157,7 +160,7 @@ export function buildReport({ doc, parsed, criteria, detResult, llm, llmError })
   lines.push('');
   lines.push(`**Вердикт:** ${meta.label}`);
   lines.push(`**Оценка:** ${score}/100${aiScore !== null ? ` (автопроверки ${detScore}, ИИ ${aiScore})` : ' (только автопроверки)'}`);
-  lines.push(`**Чек-лист:** ${criteria.name} (\`${criteria.slug}\`)`);
+  lines.push(`**Чек-лист:** ${criteria.name} (\`${criteria.slug}\`${criteria.version ? `, v${criteria.version}` : ''})`);
   lines.push(`**Документ:** ${doc.url}`);
   lines.push(`**Проверено:** ${new Date().toISOString().replace('T', ' ').slice(0, 16)} UTC`);
   if (llm?.model) lines.push(`**Модель:** ${llm.model}`);

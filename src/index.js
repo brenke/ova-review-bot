@@ -23,7 +23,7 @@ function attachHandlers(client) {
         : 'ИИ-проверка выключена: не задан LLM_API_KEY — работают только автопроверки',
     );
     log.info(
-      `Ссылка-приглашение: https://discord.com/api/oauth2/authorize?client_id=${readyClient.user.id}&permissions=${INVITE_PERMISSIONS}&scope=bot%20applications.commands`,
+      `Ссылка-приглашение: https://discord.com/api/oauth2/authorize?client_id=${config.discord.clientId || readyClient.user.id}&permissions=${INVITE_PERMISSIONS}&scope=bot%20applications.commands`,
     );
 
     try {

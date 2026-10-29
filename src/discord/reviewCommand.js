@@ -16,6 +16,7 @@ const inFlight = new Set();
 
 export async function handleReviewCommand(interaction) {
   const silent = interaction.options.getBoolean('silent') ?? false;
+  const criteriaName = interaction.options.getString('criteria') ?? undefined;
 
   await interaction.deferReply({ ephemeral: silent });
   await interaction.editReply({ content: '⏳ Ищу ссылку на документ в этом канале…' });
@@ -32,6 +33,7 @@ export async function handleReviewCommand(interaction) {
   await reviewAndReply({
     interaction,
     url: target.url,
+    criteriaName,
     sourceNote: target.source,
   });
 }
@@ -60,7 +62,7 @@ export async function handleReviewButton(interaction) {
   });
 }
 
-async function reviewAndReply({ interaction, url, sourceNote, deletePrevious }) {
+async function reviewAndReply({ interaction, url, criteriaName, sourceNote, deletePrevious }) {
   const lockKey = `${interaction.guildId ?? 'dm'}:${url}`;
   if (inFlight.has(lockKey)) {
     await interaction.editReply({ content: 'Этот документ уже проверяется, подожди немного.' });
@@ -80,7 +82,7 @@ async function reviewAndReply({ interaction, url, sourceNote, deletePrevious }) 
       await interaction.editReply({ content: `⏳ ${message}` }).catch(() => {});
     };
 
-    const result = await runReview({ docUrl: url, onProgress });
+    const result = await runReview({ docUrl: url, criteriaName, onProgress });
     const { report, doc, criteria, detResult, llm, llmError } = result;
 
     const row = new ActionRowBuilder().addComponents(

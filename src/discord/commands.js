@@ -5,6 +5,13 @@ import {
 export const reviewCommand = new SlashCommandBuilder()
   .setName('review')
   .setDescription('Проверить гугл-документ из этого топика по чек-листу сервера')
+  .addStringOption((option) =>
+    option
+      .setName('criteria')
+      .setDescription('Какой чек-лист применить (по умолчанию — базовый)')
+      .setAutocomplete(true)
+      .setRequired(false),
+  )
   .addBooleanOption((option) =>
     option
       .setName('silent')

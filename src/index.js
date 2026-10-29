@@ -16,6 +16,11 @@ function attachHandlers(client) {
   client.once(Events.ClientReady, async (readyClient) => {
     log.info(`Бот запущен как ${readyClient.user.tag}`);
     log.info(`Серверов: ${readyClient.guilds.cache.size}`);
+    if (readyClient.guilds.cache.size > 0) {
+      log.info(
+        `Подключён к: ${readyClient.guilds.cache.map((guild) => `${guild.name} (${guild.id})`).join(', ')}`,
+      );
+    }
     const llm = llmInfo();
     log.info(
       llm.configured
@@ -26,10 +31,17 @@ function attachHandlers(client) {
       `Ссылка-приглашение: https://discord.com/api/oauth2/authorize?client_id=${config.discord.clientId || readyClient.user.id}&permissions=${INVITE_PERMISSIONS}&scope=bot%20applications.commands`,
     );
 
+    if (readyClient.guilds.cache.size === 0) {
+      log.warn('Бот не добавлен ни на один сервер — открой ссылку-приглашение выше и выбери сервер.');
+    }
+
     try {
       await ensureDirs();
       const list = await listCriteria();
       log.info(`Чек-листов в data/criteria: ${list.length}${list.length ? ` (${list.map((i) => i.slug).join(', ')})` : ''}`);
+      if (list.length === 0) {
+        log.warn('Чек-листов нет: загрузи data/criteria/ova-anketa.md на хостинг или добавь его командой /criteria upload.');
+      }
     } catch (error) {
       log.warn('Не удалось прочитать чек-листы:', error.message);
     }
@@ -73,6 +85,15 @@ function attachHandlers(client) {
 
 async function deployCommands(client) {
   const body = commands.map((command) => command.toJSON());
+
+  if (config.discord.guildId && !client.guilds.cache.has(config.discord.guildId)) {
+    log.error(
+      `GUILD_ID=${config.discord.guildId}, но бот не состоит в этом сервере (Серверов: ${client.guilds.cache.size}). ` +
+        'Пригласи бота по ссылке выше, проверь ID сервера в GUILD_ID и перезапусти.',
+    );
+    return;
+  }
+
   try {
     if (config.discord.guildId) {
       await client.application.commands.set(body, config.discord.guildId);

@@ -6,13 +6,17 @@ const LEVEL_COLORS = {
 };
 const RESET = '\u001b[0m';
 
+// В панелях хостинга stdout не терминал: ANSI-коды там выглядят мусором.
+const USE_COLOR = Boolean(process.stdout.isTTY) && !process.env.NO_COLOR;
+
 function stamp() {
   return new Date().toISOString().replace('T', ' ').slice(0, 19);
 }
 
 function emit(level, scope, args) {
-  const color = LEVEL_COLORS[level] ?? '';
-  const prefix = `${stamp()} ${color}${level.toUpperCase().padEnd(5)}${RESET} [${scope}]`;
+  const color = USE_COLOR ? (LEVEL_COLORS[level] ?? '') : '';
+  const reset = USE_COLOR ? RESET : '';
+  const prefix = `${stamp()} ${color}${level.toUpperCase().padEnd(5)}${reset} [${scope}]`;
   const stream = level === 'error' || level === 'warn' ? console.error : console.log;
   stream(prefix, ...args);
 }

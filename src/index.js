@@ -82,6 +82,17 @@ function attachHandlers(client) {
     }
   });
 
+  client.on(Events.GuildCreate, (guild) => {
+    log.info(`Бот добавлен на сервер: ${guild.name} (${guild.id}), участников: ${guild.memberCount}`);
+    log.info(
+      'Глобальные слэш-команды появятся там в течение часа. Нужно сразу — перезапусти бота с GUILD_ID этого сервера.',
+    );
+  });
+
+  client.on(Events.GuildDelete, (guild) => {
+    log.warn(`Бота удалили с сервера: ${guild.name} (${guild.id})`);
+  });
+
   client.on(Events.Error, (error) => log.error('Discord client error:', error));
   client.on(Events.Warn, (message) => log.warn('Discord:', message));
 }
@@ -89,21 +100,22 @@ function attachHandlers(client) {
 async function deployCommands(client) {
   const body = commands.map((command) => command.toJSON());
 
-  if (config.discord.guildId && !client.guilds.cache.has(config.discord.guildId)) {
-    log.error(
-      `GUILD_ID=${config.discord.guildId}, но бот не состоит в этом сервере (Серверов: ${client.guilds.cache.size}). ` +
-        'Пригласи бота по ссылке выше, проверь ID сервера в GUILD_ID и перезапусти.',
-    );
-    return;
-  }
-
   try {
+    // Глобально — чтобы команды работали на любом сервере, куда добавят бота
+    await client.application.commands.set(body);
+    log.info('Слэш-команды обновлены глобально (на новом сервере могут появиться до часа)');
+
+    // Дополнительно на конкретный сервер — там команды видны сразу
     if (config.discord.guildId) {
-      await client.application.commands.set(body, config.discord.guildId);
-      log.info(`Слэш-команды обновлены на сервере ${config.discord.guildId}`);
-    } else {
-      await client.application.commands.set(body);
-      log.info('Слэш-команды обновлены глобально (может занять до часа)');
+      if (client.guilds.cache.has(config.discord.guildId)) {
+        await client.application.commands.set(body, config.discord.guildId);
+        log.info(`Слэш-команды продублированы на сервер ${config.discord.guildId} (появятся сразу)`);
+      } else {
+        log.warn(
+          `GUILD_ID=${config.discord.guildId}, но бот не состоит в этом сервере. ` +
+            'Пригласи бота по ссылке выше — глобальные команды подтянутся сами, либо поправь GUILD_ID.',
+        );
+      }
     }
   } catch (error) {
     log.error('Не удалось зарегистрировать команды:', error.message);

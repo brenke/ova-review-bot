@@ -163,11 +163,14 @@ export function normalizeCriteriaConfig(data) {
     forbiddenPhrases: asArray(data.forbidden_phrases),
     numericFields: asArray(data.numeric_fields),
     allowEmptyFields: asArray(data.allow_empty_fields),
+    softSections: asArray(data.soft_sections),
     minWords,
     minSectionWords: Number.isFinite(Number(checks.min_section_words))
       ? Number(checks.min_section_words)
       : 10,
     ageFromBirthYear: checks.age_from_birth_year !== false,
     bmi: checks.bmi !== false,
+    idFromSteamId: checks.id_from_steamid === true,
+    validUntil: String(checks.valid_until ?? '').trim(),
   };
 }

@@ -76,19 +76,25 @@ export function runChecks({ parsed, criteria }) {
       .filter((line) => /[-–—_]/.test(line)).length;
 
     if (minWords > 0 && section.words < minWords) {
+      const soft = (cfg.softSections ?? []).some((name) =>
+        aliases.some((alias) => normalizeKey(alias) === normalizeKey(name)),
+      );
       push(
         findings,
         'EMPTY_SECTION',
-        section.words < Math.max(5, minWords * 0.5) ? 'critical' : 'major',
+        soft || section.words >= Math.max(5, minWords * 0.5) ? 'major' : 'critical',
         `Раздел «${section.title}» почти пустой`,
         `Слов: ${section.words}, минимум по чек-листу: ${minWords}.${dashLines ? ` Прочерков вместо текста: ${dashLines}.` : ''}`,
         { where: section.title },
       );
     } else if (dashLines >= 2) {
+      const soft = (cfg.softSections ?? []).some((name) =>
+        aliases.some((alias) => normalizeKey(alias) === normalizeKey(name)),
+      );
       push(
         findings,
         'SECTION_DASHES',
-        'critical',
+        soft ? 'major' : 'critical',
         `Раздел «${section.title}» заполнен прочерками`,
         `Прочерков вместо содержания: ${dashLines}.`,
         { where: section.title },
@@ -133,8 +139,12 @@ export function runChecks({ parsed, criteria }) {
 
   // ── прочерки и заглушки во всех полях ─────────────────────────────────────
   const allowEmpty = (cfg.allowEmptyFields ?? []).map(normalizeKey);
+  const alreadyReported = emptyFields.map(normalizeKey);
   const placeholderFields = parsed.fields.filter(
-    (f) => isEmptyValue(f.value, placeholders) && !allowEmpty.some((allowed) => f.key.includes(allowed)),
+    (f) =>
+      isEmptyValue(f.value, placeholders) &&
+      !allowEmpty.some((allowed) => f.key.includes(allowed)) &&
+      !alreadyReported.includes(f.key),
   );
   if (placeholderFields.length) {
     const ratio = parsed.fields.length ? placeholderFields.length / parsed.fields.length : 0;
@@ -228,6 +238,45 @@ export function runChecks({ parsed, criteria }) {
     }
   }
 
+  // ── ID = последние 3 цифры SteamID (правило сервера) ──────────────────────
+  if (cfg.idFromSteamId) {
+    const idField = findField(parsed, 'ИДЕНТИФИКАЦИОННЫЙ НОМЕР', 'CID');
+    const steam = parsed.text.match(/STEAM_[01]:[01]:(\d+)/i);
+    if (idField && steam && !isEmptyValue(idField.value, placeholders)) {
+      const expected = steam[1].slice(-3).padStart(3, '0');
+      const actual = String(extractNumber(idField.value) ?? '').padStart(3, '0');
+      if (actual !== expected) {
+        push(
+          findings,
+          'ID_MISMATCH',
+          'major',
+          'Идентификационный номер не сходится со SteamID',
+          `Последние 3 цифры SteamID: ${expected}, в поле указано: ${actual}.`,
+          { where: 'Основная информация' },
+        );
+      }
+    }
+  }
+
+  // ── срок действия удостоверения ───────────────────────────────────────────
+  if (cfg.validUntil) {
+    const validField = findField(parsed, 'ДЕЙСТВИТЕЛЬНО ДО', 'ДЕЙСТВИТЕЛЬНО ДО:');
+    const expected = parseDateParts(cfg.validUntil);
+    const actual = validField && !isEmptyValue(validField.value, placeholders)
+      ? parseDateParts(validField.value)
+      : null;
+    if (actual && expected && actual !== expected) {
+      push(
+        findings,
+        'VALID_UNTIL',
+        'minor',
+        'Нестандартная дата «действительно до»',
+        `Указано «${String(validField.value).trim()}», по практике проверяющих ставят «${cfg.validUntil}».`,
+        { where: 'Удостоверение' },
+      );
+    }
+  }
+
   // ── запрещённые формулировки ──────────────────────────────────────────────
   const haystack = parsed.text.toLowerCase();
   const hits = [];
@@ -300,8 +349,14 @@ export function runChecks({ parsed, criteria }) {
   };
 }
 
-function findBirthYear(text) {
-  const patterns = [
+/** «28.10.2035» → «28.10.2035» (без ведущих нулей), для сравнения дат. */
+function parseDateParts(value) {
+  const match = String(value ?? '').match(/(\d{1,2})[.\-/](\d{1,2})[.\-/](\d{4})/);
+  if (!match) return null;
+  return `${Number(match[1])}.${Number(match[2])}.${match[3]}`;
+}
+
+function findBirthYear(text) {  const patterns = [
     /год[^\d\n]{0,25}рождения[^\d\n]{0,15}((?:19|20)\d{2})/i,
     /дата[^\d\n]{0,20}рождения[^\d\n]{0,25}((?:19|20)\d{2})/i,
     /родил(?:ся|ась)[^\d\n]{0,30}((?:19|20)\d{2})/i,

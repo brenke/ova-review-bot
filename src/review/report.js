@@ -1,21 +1,16 @@
 /**
- * Собирает итоговый вердикт и два представления отчёта:
- * короткий embed для Discord и подробный .md-файл.
+ * Собирает отчёт: короткий embed для Discord и подробный .md-файл.
+ * Вердикт бот не выносит — только факты, оценка и замечания.
  */
 
 import { EmbedBuilder } from 'discord.js';
 
 import { findField } from '../gdoc/parseDoc.js';
 
-export const VERDICTS = {
-  accept: { label: '✅ Принять', plain: 'Принять', color: 0x2ecc71 },
-  rework: { label: '🛠️ На доработку', plain: 'На доработку', color: 0xf1c40f },
-  reject: { label: '⛔ Отклонить', plain: 'Отклонить', color: 0xe74c3c },
-};
-
 const SEVERITY_ICON = { critical: '🔴', major: '🟠', minor: '🟡', info: 'ℹ️' };
 const SEVERITY_TITLE = { critical: 'Критично', major: 'Важно', minor: 'Мелочи', info: 'К сведению' };
 const STATUS_ICON = { pass: '✅', warn: '⚠️', fail: '❌' };
+const REPORT_COLOR = 0x5865f2;
 
 function truncate(text, max) {
   const value = String(text ?? '').trim();
@@ -26,13 +21,6 @@ function truncate(text, max) {
 function scoreBar(score) {
   const filled = Math.max(0, Math.min(10, Math.round(score / 10)));
   return `${'█'.repeat(filled)}${'░'.repeat(10 - filled)}`;
-}
-
-function verdictFromScore(score, hasCritical) {
-  if (hasCritical) return score < 40 ? 'reject' : 'rework';
-  if (score >= 85) return 'accept';
-  if (score >= 55) return 'rework';
-  return 'reject';
 }
 
 function personName(parsed) {
@@ -57,13 +45,6 @@ export function buildReport({ doc, parsed, criteria, detResult, llm, llmError })
   const aiScore = llm?.score ?? null;
   const score = aiScore === null ? detScore : Math.round(detScore * 0.5 + aiScore * 0.5);
 
-  let verdict = llm?.verdict ?? verdictFromScore(detScore, detResult.hasCritical);
-  if (detResult.hasCritical && verdict === 'accept') verdict = 'rework';
-  if (criteria.config.minScore !== null && score < criteria.config.minScore && verdict === 'accept') {
-    verdict = 'rework';
-  }
-
-  const meta = VERDICTS[verdict] ?? VERDICTS.rework;
   const name = personName(parsed);
 
   const allIssues = [
@@ -85,14 +66,14 @@ export function buildReport({ doc, parsed, criteria, detResult, llm, llmError })
 
   // ── embed ─────────────────────────────────────────────────────────────────
   const embed = new EmbedBuilder()
-    .setColor(meta.color)
+    .setColor(REPORT_COLOR)
     .setTitle(truncate(name ? `Проверка: ${name}` : 'Проверка документа', 250))
     .setURL(doc.url)
     .setDescription(truncate(summaryText, 1200))
     .addFields(
       {
-        name: 'Вердикт',
-        value: `**${meta.label}**\n\`${scoreBar(score)}\` ${score}/100`,
+        name: 'Оценка',
+        value: `\`${scoreBar(score)}\` **${score}/100**`,
         inline: true,
       },
       {
@@ -165,7 +146,6 @@ export function buildReport({ doc, parsed, criteria, detResult, llm, llmError })
 
   lines.push('# Проверка документа');
   lines.push('');
-  lines.push(`**Вердикт:** ${meta.label}`);
   lines.push(`**Оценка:** ${score}/100${aiScore !== null ? ` (автопроверки ${detScore}, ИИ ${aiScore})` : ' (только автопроверки)'}`);
   lines.push(`**Чек-лист:** ${criteria.name} (\`${criteria.slug}\`${criteria.version ? `, v${criteria.version}` : ''})`);
   lines.push(`**Документ:** ${doc.url}`);
@@ -252,9 +232,7 @@ export function buildReport({ doc, parsed, criteria, detResult, llm, llmError })
   const safeName = (name || 'anketa').replace(/[^\p{L}\p{N}._-]+/gu, '-').slice(0, 40);
 
   return {
-    verdict,
-    verdictLabel: meta.label,
-    color: meta.color,
+    color: REPORT_COLOR,
     score,
     detScore,
     aiScore,

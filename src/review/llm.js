@@ -26,14 +26,13 @@ const SYSTEM_PROMPT = `Ты — старший проверяющий анкет
 
 Формат ответа (строго):
 {
-  "verdict": "accept" | "rework" | "reject",
   "score": 0-100,
   "summary": "1-3 предложения с общим выводом",
   "criteria": [{ "name": "пункт чек-листа", "status": "pass" | "warn" | "fail", "comment": "коротко" }],
   "issues": [{ "severity": "critical" | "major" | "minor" | "info", "where": "раздел документа", "problem": "в чём проблема", "fix": "что сделать" }],
   "strengths": ["что получилось хорошо"]
 }
-Правила вердикта: accept — можно принимать как есть, rework — нужны правки, reject — анкета не соответствует правилам по существу.`;
+Не выноси вердикт и не советуй «принять / отклонить» — только факты, оценка и замечания. Решение принимает проверяющий.`;
 
 export function isLlmConfigured() {
   return llmConfigured;
@@ -175,7 +174,6 @@ export function extractJson(content) {
   }
 }
 
-const VERDICTS = ['accept', 'rework', 'reject'];
 const STATUSES = ['pass', 'warn', 'fail'];
 
 function asString(value) {
@@ -184,14 +182,6 @@ function asString(value) {
   if (Array.isArray(value)) return value.map(asString).filter(Boolean).join('; ');
   if (typeof value === 'object') return Object.values(value).map(asString).filter(Boolean).join('; ');
   return String(value);
-}
-
-function normalizeVerdict(value) {
-  const raw = asString(value).toLowerCase();
-  if (VERDICTS.includes(raw)) return raw;
-  if (/прин|accept|ok|годн/.test(raw)) return 'accept';
-  if (/отклон|reject|не\s*соответ|запрет/.test(raw)) return 'reject';
-  return 'rework';
 }
 
 function normalizeResult(raw) {
@@ -226,7 +216,6 @@ function normalizeResult(raw) {
   const score = Number.isFinite(scoreNumber) ? Math.max(0, Math.min(100, Math.round(scoreNumber))) : 50;
 
   return {
-    verdict: normalizeVerdict(raw?.verdict),
     score,
     summary: asString(raw?.summary),
     criteria,

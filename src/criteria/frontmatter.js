@@ -156,7 +156,6 @@ export function normalizeCriteriaConfig(data) {
     description: String(data.description ?? '').trim(),
     version: data.version ?? '',
     model: String(data.model ?? '').trim(),
-    minScore: Number.isFinite(Number(data.min_score)) ? Number(data.min_score) : null,
     requiredSections: asArray(data.required_sections),
     requiredFields: asArray(data.required_fields),
     forbiddenPlaceholders: asArray(data.forbidden_placeholders),

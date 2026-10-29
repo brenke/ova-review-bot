@@ -56,6 +56,43 @@ function isKnownFalsePositive(issue) {
   return /кад/.test(text) && /кпд/.test(text) && !/права|категори/.test(text);
 }
 
+/** «Вкладки» документа: порядок и правила сопоставления по тексту замечания. */
+const SECTIONS = [
+  { title: 'Титульный лист', re: /титул/ },
+  { title: 'Основная информация', re: /основн/ },
+  { title: 'Физическая информация', re: /физическ/ },
+  { title: 'Информация о семье', re: /семь/ },
+  { title: 'Медицинская карта', re: /медицин|мед\s*карт|заметки для врача|заболеван|аллерг/ },
+  { title: 'Имплантация', re: /имплант/ },
+  { title: 'Психологический портрет', re: /психолог/ },
+  { title: 'Биография', re: /биограф|сводка деятельности/ },
+  { title: 'Удостоверение', re: /удостовер|кпд|подпис|выдано/ },
+  { title: 'Лор и правила', re: /лор|нелорн|секретн|фракц|город/ },
+];
+
+function sectionFor(issue) {
+  const text = `${issue.where ?? ''} ${issue.problem ?? ''}`.toLowerCase();
+  const found = SECTIONS.find((section) => section.re.test(text));
+  return found ? found.title : 'Прочее';
+}
+
+/** Группирует замечания по разделам в порядке вкладок документа. */
+function groupBySection(issues) {
+  const groups = new Map();
+  for (const issue of issues) {
+    const title = sectionFor(issue);
+    if (!groups.has(title)) groups.set(title, []);
+    groups.get(title).push(issue);
+  }
+
+  const ordered = [];
+  for (const section of SECTIONS) {
+    if (groups.has(section.title)) ordered.push([section.title, groups.get(section.title)]);
+  }
+  if (groups.has('Прочее')) ordered.push(['Прочее', groups.get('Прочее')]);
+  return ordered;
+}
+
 export function buildReport({ doc, parsed, criteria, detResult, llm, llmError }) {
   const name = personName(parsed);
 
@@ -70,6 +107,10 @@ export function buildReport({ doc, parsed, criteria, detResult, llm, llmError })
     const order = { critical: 0, major: 1, minor: 2, info: 3 };
     return (order[a.severity] ?? 4) - (order[b.severity] ?? 4);
   });
+
+  // В «вкладки» попадают только проблемы: критично / важно / мелочи
+  const problems = allIssues.filter((issue) => issue.severity !== 'info');
+  const notes = allIssues.filter((issue) => issue.severity === 'info');
 
   const blocking = detResult.counts.critical + detResult.counts.major;
   const summaryText =
@@ -87,21 +128,28 @@ export function buildReport({ doc, parsed, criteria, detResult, llm, llmError })
     .setURL(doc.url)
     .setDescription(truncate(summaryText, 1200));
 
-  const criticalAndMajor = allIssues.filter((i) => i.severity === 'critical' || i.severity === 'major');
-  if (criticalAndMajor.length) {
+  // Раздел = «вкладка» документа; внутри — только проблемы (🔴/🟠/🟡)
+  const groups = groupBySection(problems);
+  groups.forEach(([title, items], index) => {
+    const lines = items.map((item) => {
+      const icon = SEVERITY_ICON[item.severity] ?? '•';
+      const head = `**${item.problem}**`;
+      const fix = item.fix ? `\n   ↳ ${String(item.fix).replace(/\n/g, ' ')}` : '';
+      return `${icon} ${head}${fix}`;
+    });
     embed.addFields({
-      name: 'Главные замечания',
-      value: truncate(
-        criticalAndMajor
-          .slice(0, 6)
-          .map((i) => `${SEVERITY_ICON[i.severity] ?? '•'} **${i.where || 'Документ'}** — ${i.problem}`)
-          .join('\n'),
-        1000,
-      ),
+      name: truncate(`${index + 1} · ${title}`, 250),
+      value: truncate(lines.join('\n'), 1000),
+    });
+  });
+
+  if (!groups.length) {
+    embed.addFields({
+      name: 'Замечаний нет',
+      value: 'Проблемных пунктов не найдено — остальное в пометках ниже.',
     });
   }
 
-  const notes = allIssues.filter((i) => i.severity === 'info');
   if (notes.length) {
     embed.addFields({
       name: `${SEVERITY_ICON.info} К сведению`,
@@ -171,29 +219,36 @@ export function buildReport({ doc, parsed, criteria, detResult, llm, llmError })
   lines.push(`| Пустых полей | ${detResult.stats.placeholderFields} |`);
   lines.push('');
 
-  if (allIssues.length) {
-    lines.push('## Замечания');
-    for (const severity of ['critical', 'major', 'minor', 'info']) {
-      const group = allIssues.filter((i) => i.severity === severity);
-      if (!group.length) continue;
+  if (problems.length) {
+    lines.push('## Замечания по разделам');
+    groups.forEach(([title, items], index) => {
       lines.push('');
-      lines.push(`### ${SEVERITY_ICON[severity]} ${SEVERITY_TITLE[severity]} (${group.length})`);
+      lines.push(`### ${index + 1} · ${title} (${items.length})`);
       lines.push('');
-      group.forEach((issue, index) => {
+      items.forEach((issue, itemIndex) => {
         const source = issue.auto ? ' _(автопроверка)_' : '';
-        lines.push(`${index + 1}. **${issue.where || 'Документ'}** — ${issue.problem}${source}`);
+        lines.push(`${itemIndex + 1}. ${SEVERITY_ICON[issue.severity] ?? '•'} ${issue.problem}${source}`);
         if (issue.fix) {
           for (const fixLine of String(issue.fix).split('\n')) {
             lines.push(`   - ${fixLine.trim()}`);
           }
         }
       });
-    }
+    });
     lines.push('');
   } else {
-    lines.push('## Замечания');
+    lines.push('## Замечания по разделам');
     lines.push('');
-    lines.push('Замечаний нет.');
+    lines.push('Проблемных пунктов нет.');
+    lines.push('');
+  }
+
+  if (notes.length) {
+    lines.push('## К сведению');
+    lines.push('');
+    for (const note of notes) {
+      lines.push(`- **${note.where || 'Документ'}** — ${note.problem}`);
+    }
     lines.push('');
   }
 

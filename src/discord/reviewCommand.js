@@ -5,6 +5,9 @@ import {
   MessageFlags,
 } from 'discord.js';
 
+import { PermissionFlagsBits } from 'discord.js';
+
+import { config } from '../config.js';
 import { createLogger } from '../logger.js';
 import { runReview } from '../review/runReview.js';
 import { findDocLinkInChannel } from './findDocLink.js';
@@ -14,7 +17,23 @@ const log = createLogger('review');
 /** Не даём запустить две проверки одного документа одновременно. */
 const inFlight = new Set();
 
+/** Доступ к проверке: админы всегда, роли из REVIEW_ROLE_IDS — если список задан. */
+function canRunReview(interaction) {
+  const roleIds = config.discord.reviewRoleIds ?? [];
+  if (!roleIds.length) return true; // список не задан — доступно всем
+  if (interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild)) return true;
+  return roleIds.some((roleId) => interaction.member?.roles?.cache?.has(roleId));
+}
+
 export async function handleReviewCommand(interaction) {
+  if (!canRunReview(interaction)) {
+    await interaction.reply({
+      content: 'Недостаточно прав для запуска проверки. Обратись к проверяющему или администратору.',
+      ephemeral: true,
+    });
+    return;
+  }
+
   const silent = interaction.options.getBoolean('silent') ?? false;
   const criteriaName = interaction.options.getString('criteria') ?? undefined;
 

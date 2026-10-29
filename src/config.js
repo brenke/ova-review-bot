@@ -47,12 +47,22 @@ const envBool = (name, fallback) => {
   return ['1', 'true', 'yes', 'on', 'да'].includes(v);
 };
 
+/** Список ID из строки: разделители — запятая, точка с запятой, пробел, перенос. */
+const envIdList = (name) =>
+  env(name)
+    .split(/[\s,;|]+/)
+    .map((value) => value.trim())
+    .filter((value) => /^\d{15,25}$/.test(value));
+
 export const config = {
   discord: {
     token: env('DISCORD_TOKEN'),
     clientId: env('DISCORD_CLIENT_ID'),
     guildId: env('GUILD_ID'),
-    reviewerRoleId: env('REVIEWER_ROLE_ID'),
+    // Роли, которым можно управлять чек-листами (/criteria ...)
+    reviewerRoleIds: envIdList('REVIEWER_ROLE_ID'),
+    // Роли, которым можно запускать проверку. Пусто — /review доступна всем
+    reviewRoleIds: envIdList('REVIEW_ROLE_IDS'),
     deployCommands: envBool('DEPLOY_COMMANDS', true),
   },
   llm: {

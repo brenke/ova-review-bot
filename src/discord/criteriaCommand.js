@@ -21,16 +21,16 @@ const MAX_UPLOAD_BYTES = 256 * 1024;
 
 export function canManageCriteria(interaction) {
   if (interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild)) return true;
-  const roleId = config.discord.reviewerRoleId;
-  if (!roleId) return false;
-  return Boolean(interaction.member?.roles?.cache?.has(roleId));
+  const roleIds = config.discord.reviewerRoleIds ?? [];
+  if (!roleIds.length) return false;
+  return roleIds.some((roleId) => interaction.member?.roles?.cache?.has(roleId));
 }
 
 export async function handleCriteriaCommand(interaction) {
   if (!canManageCriteria(interaction)) {
     await interaction.reply({
       content:
-        'Недостаточно прав. Менять чек-листы может тот, у кого есть право «Управление сервером», или роль из `REVIEWER_ROLE_ID`.',
+        'Недостаточно прав. Менять чек-листы может тот, у кого есть право «Управление сервером», или одна из ролей из `REVIEWER_ROLE_ID` (можно перечислить несколько через запятую).',
       ephemeral: true,
     });
     return;

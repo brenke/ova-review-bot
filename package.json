@@ -11,7 +11,8 @@
     "start": "node src/index.js",
     "dev": "node --watch src/index.js",
     "register": "node scripts/register.js",
-    "review": "node scripts/review-cli.js"
+    "review": "node scripts/review-cli.js",
+    "publish": "node scripts/publish.js"
   },
   "dependencies": {
     "discord.js": "^14.27.0"

@@ -2,6 +2,7 @@ import {
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
+  MessageFlags,
 } from 'discord.js';
 
 import { createLogger } from '../logger.js';
@@ -78,17 +79,24 @@ export async function handleReviewButton(interaction) {
     return;
   }
 
-  await interaction.deferReply();
+  // Если исходный отчёт был «только для себя» — новый тоже делаем приватным
+  const ephemeral = interaction.message?.flags?.has(MessageFlags.Ephemeral) ?? false;
+  await interaction.deferReply({ ephemeral });
 
   const url =
     kind === 'e'
       ? `https://docs.google.com/document/d/e/${docId}/pub`
       : `https://docs.google.com/document/d/${docId}/edit`;
 
-  await reviewAndReply({ interaction, url, sourceNote: 'кнопка «Перепроверить»' });
+  await reviewAndReply({
+    interaction,
+    url,
+    sourceNote: 'кнопка «Перепроверить»',
+    deletePrevious: interaction.message,
+  });
 }
 
-async function reviewAndReply({ interaction, url, criteriaName, criteriaOverride, sourceNote }) {
+async function reviewAndReply({ interaction, url, criteriaName, criteriaOverride, sourceNote, deletePrevious }) {
   const lockKey = `${interaction.guildId ?? 'dm'}:${url}`;
   if (inFlight.has(lockKey)) {
     await interaction.editReply({ content: 'Этот документ уже проверяется, подожди немного.' });
@@ -124,6 +132,13 @@ async function reviewAndReply({ interaction, url, criteriaName, criteriaOverride
       embeds: [report.embed],
       components: [row],
     });
+
+    // При перепроверке убираем старое сообщение — остаётся только свежий отчёт.
+    if (deletePrevious) {
+      await deletePrevious.delete().catch((error) => {
+        log.warn('Не удалось удалить прошлый отчёт:', error.message);
+      });
+    }
 
     log.info(
       `Проверка ${doc.docId}: замечаний ${detResult.findings.length} (🔴 ${detResult.counts.critical}, 🟠 ${detResult.counts.major}, 🟡 ${detResult.counts.minor}, ℹ️ ${detResult.counts.info}), чек-лист ${criteria.slug} (${criteria.updatedAt?.toISOString().slice(0, 16) ?? '—'}), ИИ: ${llm ? 'да' : llmError ? 'ошибка' : 'нет'}`,

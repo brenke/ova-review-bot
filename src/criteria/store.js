@@ -25,6 +25,52 @@ export async function ensureDirs() {
   await fs.mkdir(paths.criteria, { recursive: true });
   await fs.mkdir(paths.criteriaHistory, { recursive: true });
   await fs.mkdir(paths.reports, { recursive: true });
+  await seedCriteria();
+}
+
+/**
+ * На хостинге каталог /app/data — постоянный том, он перекрывает data/ из
+ * репозитория. Поэтому базовые чек-листы лежат в content/criteria и при пустом
+ * хранилище копируются в data/criteria. Если в репозитории версия выше —
+ * обновляем, старую сохраняем в .history.
+ */
+async function seedCriteria() {
+  try {
+    const seeds = (await fs.readdir(paths.criteriaSeed)).filter((name) => name.toLowerCase().endsWith('.md'));
+
+    for (const name of seeds) {
+      const source = path.join(paths.criteriaSeed, name);
+      const target = path.join(paths.criteria, name);
+
+      let currentRaw = null;
+      try {
+        currentRaw = await fs.readFile(target, 'utf8');
+      } catch {
+        currentRaw = null;
+      }
+
+      if (currentRaw !== null && !isNewerVersion(await fs.readFile(source, 'utf8'), currentRaw)) continue;
+
+      if (currentRaw !== null) {
+        const historyDir = path.join(paths.criteriaHistory, name.replace(/\.md$/i, ''));
+        await fs.mkdir(historyDir, { recursive: true });
+        const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+        await fs.writeFile(path.join(historyDir, `${stamp}.md`), currentRaw, 'utf8');
+      }
+
+      await fs.copyFile(source, target);
+    }
+  } catch {
+    // нет папки content/criteria — работаем без сидов
+  }
+}
+
+/** Сравнивает поле version: true, если в сиде версия выше текущей. */
+function isNewerVersion(seedRaw, currentRaw) {
+  const seedVersion = Number(normalizeCriteriaConfig(parseFrontmatter(seedRaw).data).version);
+  const currentVersion = Number(normalizeCriteriaConfig(parseFrontmatter(currentRaw).data).version);
+  if (!Number.isFinite(seedVersion) || !Number.isFinite(currentVersion)) return false;
+  return seedVersion > currentVersion;
 }
 
 export function suggestSlug(filename) {

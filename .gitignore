@@ -4,3 +4,4 @@ data/criteria/.history/
 data/reports/
 *.log
 data/dumps/
+data/criteria/*.md

@@ -5,6 +5,7 @@ import { listCriteria, ensureDirs } from './criteria/store.js';
 import { commands } from './discord/commands.js';
 import { handleCriteriaCommand } from './discord/criteriaCommand.js';
 import { handleInfoCommand } from './discord/infoCommand.js';
+import { listLoreFiles } from './lore/store.js';
 import { handleReviewButton, handleReviewCommand } from './discord/reviewCommand.js';
 import { createLogger } from './logger.js';
 import { llmInfo } from './review/llm.js';
@@ -41,10 +42,19 @@ function attachHandlers(client) {
       const list = await listCriteria();
       log.info(`Чек-листов в data/criteria: ${list.length}${list.length ? ` (${list.map((i) => i.slug).join(', ')})` : ''}`);
       if (list.length === 0) {
-        log.warn('Чек-листов нет: загрузи data/criteria/ova-dossier.md на хостинг или добавь его командой /criteria upload.');
+        log.warn('Чек-листов нет: загрузи чек-лист командой /criteria upload или проверь content/criteria.');
       }
     } catch (error) {
       log.warn('Не удалось прочитать чек-листы:', error.message);
+    }
+
+    try {
+      const loreFiles = await listLoreFiles();
+      log.info(
+        `Файлов лора: ${loreFiles.length}${loreFiles.length ? ` (${loreFiles.join(', ')})` : ' — папка content/lore пуста'}`,
+      );
+    } catch (error) {
+      log.warn('Не удалось прочитать лор:', error.message);
     }
 
     if (config.discord.deployCommands) await deployCommands(readyClient);

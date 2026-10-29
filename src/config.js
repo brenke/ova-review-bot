@@ -82,10 +82,13 @@ export const config = {
 
 export const paths = {
   data: config.review.dataDir,
+  // Статичный контент из репозитория: не перекрывается томом /app/data на хостинге
+  content: path.join(ROOT_DIR, 'content'),
+  lore: path.join(ROOT_DIR, 'content', 'lore'),
+  criteriaSeed: path.join(ROOT_DIR, 'content', 'criteria'),
   criteria: path.join(config.review.dataDir, 'criteria'),
   criteriaHistory: path.join(config.review.dataDir, 'criteria', '.history'),
   reports: path.join(config.review.dataDir, 'reports'),
-  lore: path.join(config.review.dataDir, 'lore'),
 };
 
 /** Есть ли чем обращаться к модели. */

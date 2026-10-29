@@ -9,6 +9,16 @@ const log = createLogger('lore');
 /** Сколько символов лора максимум подмешивать в промпт. */
 const MAX_TOTAL_CHARS = 24_000;
 
+/** Имена доступных файлов лора (для логов и диагностики). */
+export async function listLoreFiles() {
+  try {
+    const files = await fs.readdir(paths.lore);
+    return files.filter((name) => name.toLowerCase().endsWith('.md'));
+  } catch {
+    return [];
+  }
+}
+
 /**
  * Загружает файлы лора, перечисленные в чек-листе (`lore:` в шапке).
  * Всё берётся из data/lore/. Отсутствующий файл — предупреждение, не ошибка.

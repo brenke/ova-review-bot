@@ -60,22 +60,7 @@ export function buildReport({ doc, parsed, criteria, detResult, llm, llmError })
     .setColor(REPORT_COLOR)
     .setTitle(truncate(name ? `Проверка: ${name}` : 'Проверка документа', 250))
     .setURL(doc.url)
-    .setDescription(truncate(summaryText, 1200))
-    .addFields(
-      {
-        name: 'Автопроверки',
-        value: `${SEVERITY_ICON.critical} ${detResult.counts.critical} · ${SEVERITY_ICON.major} ${detResult.counts.major} · ${SEVERITY_ICON.minor} ${detResult.counts.minor}${detResult.counts.info ? ` · ${SEVERITY_ICON.info} ${detResult.counts.info}` : ''}`,
-        inline: true,
-      },
-      {
-        name: 'Чек-лист',
-        value: truncate(
-          `${criteria.name}\n\`${criteria.slug}\`${criteria.version ? ` · v${criteria.version}` : ''}`,
-          100,
-        ),
-        inline: true,
-      },
-    );
+    .setDescription(truncate(summaryText, 1200));
 
   const criticalAndMajor = allIssues.filter((i) => i.severity === 'critical' || i.severity === 'major');
   if (criticalAndMajor.length) {

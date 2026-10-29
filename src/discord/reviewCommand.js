@@ -128,7 +128,7 @@ async function reviewAndReply({ interaction, url, criteriaName, criteriaOverride
     );
 
     await interaction.editReply({
-      content: `📄 Документ: ${doc.url}\n🧾 Чек-лист: **${criteria.name}**`,
+      content: `📄 Документ: ${doc.url}`,
       embeds: [report.embed],
       components: [row],
     });

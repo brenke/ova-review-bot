@@ -25,10 +25,7 @@ export async function handleInfoCommand(interaction) {
       {
         name: '📄 /review — проверить документ',
         value: [
-          '`/review` — в топике найдёт ссылку сам',
-          '`/review url:<ссылка>` — явно указать документ',
-          '`/review criteria:<имя>` — другой чек-лист',
-          '`/review file:<файл.md>` — свой чек-лист на один раз',
+          '`/review` — проверить документ из этого топика (ссылку найдёт сам)',
           '`/review silent:true` — результат только вам',
         ].join('\n'),
       },

@@ -4,26 +4,7 @@ import {
 
 export const reviewCommand = new SlashCommandBuilder()
   .setName('review')
-  .setDescription('Проверить гугл-документ по чек-листу сервера')
-  .addStringOption((option) =>
-    option
-      .setName('url')
-      .setDescription('Ссылка на Google Документ. Пусто — бот поищет её в топике')
-      .setRequired(false),
-  )
-  .addStringOption((option) =>
-    option
-      .setName('criteria')
-      .setDescription('Какой чек-лист применить (по умолчанию — базовый)')
-      .setAutocomplete(true)
-      .setRequired(false),
-  )
-  .addAttachmentOption((option) =>
-    option
-      .setName('file')
-      .setDescription('Свой .md-чек-лист на один раз (без сохранения)')
-      .setRequired(false),
-  )
+  .setDescription('Проверить гугл-документ из этого топика по чек-листу сервера')
   .addBooleanOption((option) =>
     option
       .setName('silent')

@@ -6,7 +6,6 @@ import {
 } from 'discord.js';
 
 import { createLogger } from '../logger.js';
-import { parseCriteriaContent } from '../criteria/store.js';
 import { runReview } from '../review/runReview.js';
 import { findDocLinkInChannel } from './findDocLink.js';
 
@@ -17,31 +16,15 @@ const inFlight = new Set();
 
 export async function handleReviewCommand(interaction) {
   const silent = interaction.options.getBoolean('silent') ?? false;
-  const criteriaName = interaction.options.getString('criteria') ?? undefined;
-  const providedUrl = interaction.options.getString('url') ?? undefined;
 
   await interaction.deferReply({ ephemeral: silent });
+  await interaction.editReply({ content: '⏳ Ищу ссылку на документ в этом канале…' });
 
-  let criteriaOverride;
-  try {
-    criteriaOverride = await loadInlineCriteria(interaction);
-  } catch (error) {
-    await interaction.editReply({ content: `❌ ${error.message}` });
-    return;
-  }
-
-  let target;
-  if (providedUrl) {
-    target = { url: providedUrl.trim(), source: 'аргумент команды' };
-  } else {
-    await interaction.editReply({ content: '⏳ Ищу ссылку на документ в этом канале…' });
-    target = await findDocLinkInChannel(interaction.channel);
-  }
-
+  const target = await findDocLinkInChannel(interaction.channel);
   if (!target) {
     await interaction.editReply({
       content:
-        'Не нашёл ссылку на Google Документ. Пришли ссылку сообщением в топик или укажи её в команде:\n`/review url:https://docs.google.com/document/d/…/edit`',
+        'Не нашёл ссылку на Google Документ. Пришли ссылку сообщением в этот топик (или отдельным сообщением в канал) и вызови `/review` снова.',
     });
     return;
   }
@@ -49,27 +32,8 @@ export async function handleReviewCommand(interaction) {
   await reviewAndReply({
     interaction,
     url: target.url,
-    criteriaName,
-    criteriaOverride,
     sourceNote: target.source,
   });
-}
-
-/** Одноразовый чек-лист, приложенный к команде: /review file:my.md */
-async function loadInlineCriteria(interaction) {
-  const attachment = interaction.options.getAttachment('file');
-  if (!attachment) return undefined;
-
-  if (!/\.md$/i.test(attachment.name ?? '')) {
-    throw new Error('Нужен файл с расширением .md.');
-  }
-  if (attachment.size > 256 * 1024) {
-    throw new Error('Файл с критериями больше 256 КБ.');
-  }
-
-  const response = await fetch(attachment.url, { signal: AbortSignal.timeout(30_000) });
-  if (!response.ok) throw new Error('Не удалось скачать вложенный .md из Discord.');
-  return parseCriteriaContent(await response.text(), attachment.name);
 }
 
 export async function handleReviewButton(interaction) {
@@ -96,7 +60,7 @@ export async function handleReviewButton(interaction) {
   });
 }
 
-async function reviewAndReply({ interaction, url, criteriaName, criteriaOverride, sourceNote, deletePrevious }) {
+async function reviewAndReply({ interaction, url, sourceNote, deletePrevious }) {
   const lockKey = `${interaction.guildId ?? 'dm'}:${url}`;
   if (inFlight.has(lockKey)) {
     await interaction.editReply({ content: 'Этот документ уже проверяется, подожди немного.' });
@@ -116,7 +80,7 @@ async function reviewAndReply({ interaction, url, criteriaName, criteriaOverride
       await interaction.editReply({ content: `⏳ ${message}` }).catch(() => {});
     };
 
-    const result = await runReview({ docUrl: url, criteriaName, criteria: criteriaOverride, onProgress });
+    const result = await runReview({ docUrl: url, onProgress });
     const { report, doc, criteria, detResult, llm, llmError } = result;
 
     const row = new ActionRowBuilder().addComponents(

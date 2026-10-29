@@ -1,0 +1,19 @@
+{
+  "name": "ova-review-bot",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Discord-бот: проверка гугл-документов (личных дел) по правилам сервера",
+  "engines": {
+    "node": ">=20.6.0"
+  },
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js",
+    "register": "node scripts/register.js",
+    "review": "node scripts/review-cli.js"
+  },
+  "dependencies": {
+    "discord.js": "^14.27.0"
+  }
+}

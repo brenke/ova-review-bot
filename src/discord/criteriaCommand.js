@@ -81,13 +81,16 @@ async function handleUpload(interaction) {
       [
         `**Название:** ${saved.name}`,
         `**Имя (slug):** \`${saved.slug}\``,
+        `**Версия:** ${saved.version || '—'}`,
+        `**Файл:** \`data/criteria/${saved.slug}.md\``,
+        `**Обновлён:** <t:${Math.floor(saved.updatedAt.getTime() / 1000)}:T>`,
         `**Обязательных разделов:** ${saved.config.requiredSections.length}`,
         `**Обязательных полей:** ${saved.config.requiredFields.length}`,
         `**Слов в критериях:** ${saved.words}`,
         '',
         `Проверка: \`/review criteria:${saved.slug}\``,
-        saved.slug === 'ova-anketa'
-          ? ''
+        saved.slug === (config.review.defaultCriteria || saved.slug)
+          ? 'Этот чек-лист применяется по умолчанию.'
           : 'Чтобы этот чек-лист стал базовым, задай `DEFAULT_CRITERIA` в .env.',
       ]
         .filter(Boolean)

@@ -132,7 +132,7 @@ async function reviewAndReply({ interaction, url, criteriaName, criteriaOverride
     });
 
     log.info(
-      `Проверка ${doc.docId}: ${report.score}/100, замечаний: ${detResult.findings.length}, ИИ: ${llm ? 'да' : llmError ? 'ошибка' : 'нет'}`,
+      `Проверка ${doc.docId}: ${report.score}/100, замечаний: ${detResult.findings.length}, чек-лист ${criteria.slug} (${criteria.updatedAt?.toISOString().slice(0, 16) ?? '—'}), ИИ: ${llm ? 'да' : llmError ? 'ошибка' : 'нет'}`,
     );
   } catch (error) {
     log.error('Ошибка проверки:', error);

@@ -132,9 +132,12 @@ export function buildReport({ doc, parsed, criteria, detResult, llm, llmError })
     });
   }
 
+  const criteriaStamp = criteria.updatedAt
+    ? criteria.updatedAt.toISOString().replace('T', ' ').slice(0, 16)
+    : '';
   embed.setFooter({
     text: truncate(
-      `Автопроверки: ${detScore}/100${aiScore !== null ? ` · ИИ (${llm?.model ?? criteria.config.model ?? 'модель'}): ${aiScore}/100` : ''}`,
+      `Автопроверки: ${detScore}/100${aiScore !== null ? ` · ИИ (${llm?.model ?? criteria.config.model ?? 'модель'}): ${aiScore}/100` : ''}${criteriaStamp ? ` · чек-лист от ${criteriaStamp}` : ''}`,
       200,
     ),
   });
@@ -148,6 +151,9 @@ export function buildReport({ doc, parsed, criteria, detResult, llm, llmError })
   lines.push('');
   lines.push(`**Оценка:** ${score}/100${aiScore !== null ? ` (автопроверки ${detScore}, ИИ ${aiScore})` : ' (только автопроверки)'}`);
   lines.push(`**Чек-лист:** ${criteria.name} (\`${criteria.slug}\`${criteria.version ? `, v${criteria.version}` : ''})`);
+  if (criteria.updatedAt) {
+    lines.push(`**Файл чек-листа обновлён:** ${criteria.updatedAt.toISOString().replace('T', ' ').slice(0, 16)} UTC`);
+  }
   lines.push(`**Документ:** ${doc.url}`);
   lines.push(`**Проверено:** ${new Date().toISOString().replace('T', ' ').slice(0, 16)} UTC`);
   if (llm?.model) lines.push(`**Модель:** ${llm.model}`);

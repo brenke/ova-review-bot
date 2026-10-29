@@ -40,7 +40,7 @@ function attachHandlers(client) {
       const list = await listCriteria();
       log.info(`Чек-листов в data/criteria: ${list.length}${list.length ? ` (${list.map((i) => i.slug).join(', ')})` : ''}`);
       if (list.length === 0) {
-        log.warn('Чек-листов нет: загрузи data/criteria/ova-anketa.md на хостинг или добавь его командой /criteria upload.');
+        log.warn('Чек-листов нет: загрузи data/criteria/ova-dossier.md на хостинг или добавь его командой /criteria upload.');
       }
     } catch (error) {
       log.warn('Не удалось прочитать чек-листы:', error.message);

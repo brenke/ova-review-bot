@@ -69,9 +69,11 @@ export function runChecks({ parsed, criteria }) {
       aliases.some((alias) => normalizeKey(alias) === normalizeKey(key)),
     )?.[1];
     const minWords = Math.max(minFromMap ?? 0, cfg.minSectionWords ?? 0);
+    // Прочерки как содержимое («-», «—»), но не разделители таблиц из точек/звёздочек
     const dashLines = section.body
       .split('\n')
-      .filter((line) => !line.includes(':') && isEmptyValue(line, placeholders)).length;
+      .filter((line) => !line.includes(':') && /^[-–—_=~*.\s]{1,40}$/.test(line.trim()))
+      .filter((line) => /[-–—_]/.test(line)).length;
 
     if (minWords > 0 && section.words < minWords) {
       push(

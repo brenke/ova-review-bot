@@ -41,7 +41,7 @@ function push(findings, code, severity, title, detail, extra = {}) {
 /**
  * @param {{parsed: ReturnType<import('../gdoc/parseDoc.js').parseDocument>, criteria: object}} input
  */
-export function runChecks({ parsed, criteria }) {
+export function runChecks({ parsed, criteria, steamId }) {
   const cfg = criteria?.config ?? criteria ?? {};
   /** @type {Array<{code: string, severity: 'critical'|'major'|'minor', title: string, detail: string, where?: string}>} */
   const findings = [];
@@ -243,9 +243,12 @@ export function runChecks({ parsed, criteria }) {
   // ── ID = последние 3 цифры SteamID (правило сервера) ──────────────────────
   if (cfg.idFromSteamId) {
     const idField = findField(parsed, 'ИДЕНТИФИКАЦИОННЫЙ НОМЕР', 'CID');
-    const steam = parsed.text.match(/STEAM_[01]:[01]:(\d+)/i);
-    if (idField && steam && !isEmptyValue(idField.value, placeholders)) {
-      const expected = steam[1].slice(-3).padStart(3, '0');
+    // SteamID приходит из сообщения с анкетой; если его нет — ищем в самом досье
+    const steamMatch = steamId
+      ? String(steamId).match(/(\d+)\s*$/)
+      : parsed.text.match(/STEAM_[01]:[01]:(\d+)/i);
+    if (idField && steamMatch && !isEmptyValue(idField.value, placeholders)) {
+      const expected = steamMatch[1].slice(-3).padStart(3, '0');
       const actual = String(extractNumber(idField.value) ?? '').padStart(3, '0');
       if (actual !== expected) {
         push(
@@ -253,7 +256,7 @@ export function runChecks({ parsed, criteria }) {
           'ID_MISMATCH',
           'major',
           'Идентификационный номер не сходится со SteamID',
-          `Последние 3 цифры SteamID: ${expected}, в поле указано: ${actual}.`,
+          `Последние 3 цифры SteamID (${steamId ?? parsed.text.match(/STEAM_[01]:[01]:\d+/i)?.[0] ?? '—'}): ${expected}, в поле указано: ${actual}.`,
           { where: 'Основная информация' },
         );
       }

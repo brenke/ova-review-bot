@@ -10,7 +10,7 @@ import { buildReport } from './report.js';
 /**
  * Полный цикл проверки: скачать док → разобрать → автопроверки → ИИ → отчёт.
  */
-export async function runReview({ docUrl, criteriaName, criteria: criteriaInput, model, onProgress } = {}) {
+export async function runReview({ docUrl, criteriaName, criteria: criteriaInput, model, steamId, onProgress } = {}) {
   const progress = onProgress ?? (() => {});
 
   progress('Читаю чек-лист…');
@@ -23,7 +23,7 @@ export async function runReview({ docUrl, criteriaName, criteria: criteriaInput,
   const parsed = parseDocument(doc.text);
 
   progress('Выполняю автопроверки…');
-  const detResult = runChecks({ parsed, criteria });
+  const detResult = runChecks({ parsed, criteria, steamId });
 
   const loreText = await loadLore(criteria.config.lore);
 
@@ -38,7 +38,7 @@ export async function runReview({ docUrl, criteriaName, criteria: criteriaInput,
         : doc.text;
 
     try {
-      llm = await reviewWithLlm({ docText, criteria, detResult, docMeta: doc, model, loreText });
+      llm = await reviewWithLlm({ docText, criteria, detResult, docMeta: doc, model, loreText, steamId });
       if (llm) llm.model = model || criteria.config.model || config.llm.model;
     } catch (error) {
       llmError = error?.message ?? String(error);

@@ -35,11 +35,36 @@ function autoFindingsAsIssues(findings) {
   }));
 }
 
+/**
+ * Биография и психологический портрет — не блокеры. Если модель всё равно
+ * пометила их как критичные/важные только за пустоту, понижаем до «к сведению».
+ */
+function isNonBlockingEmptyIssue(issue) {
+  const where = String(issue.where ?? '').toLowerCase();
+  const text = `${issue.problem ?? ''} ${issue.fix ?? ''}`.toLowerCase();
+  const section = /биограф|психологическ/.test(where);
+  const empty = /пуст|не заполн|нет информации|отсутств|не написан|нет текста|не указан/.test(text);
+  return section && empty;
+}
+
+/**
+ * Заведомо ложные срабатывания модели, которые нельзя объяснить лору.
+ * «КАД без КПД» — норма: КПД нужен только для прав категории C.
+ */
+function isKnownFalsePositive(issue) {
+  const text = `${issue.where ?? ''} ${issue.problem ?? ''}`.toLowerCase();
+  return /кад/.test(text) && /кпд/.test(text) && !/права|категори/.test(text);
+}
+
 export function buildReport({ doc, parsed, criteria, detResult, llm, llmError }) {
   const name = personName(parsed);
 
+  const llmIssues = (llm?.issues ?? [])
+    .filter((issue) => !isKnownFalsePositive(issue))
+    .map((issue) => (isNonBlockingEmptyIssue(issue) ? { ...issue, severity: 'info' } : issue));
+
   const allIssues = [
-    ...(llm?.issues ?? []),
+    ...llmIssues,
     ...autoFindingsAsIssues(detResult.findings),
   ].sort((a, b) => {
     const order = { critical: 0, major: 1, minor: 2, info: 3 };

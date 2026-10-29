@@ -10,7 +10,7 @@ import { PermissionFlagsBits } from 'discord.js';
 import { config } from '../config.js';
 import { createLogger } from '../logger.js';
 import { runReview } from '../review/runReview.js';
-import { findDocLinkInChannel } from './findDocLink.js';
+import { extractSteamId, findDocLinkInChannel } from './findDocLink.js';
 
 const log = createLogger('review');
 
@@ -53,6 +53,7 @@ export async function handleReviewCommand(interaction) {
     interaction,
     url: target.url,
     criteriaName,
+    steamId: target.steamId,
     sourceNote: target.source,
   });
 }
@@ -73,15 +74,27 @@ export async function handleReviewButton(interaction) {
       ? `https://docs.google.com/document/d/e/${docId}/pub`
       : `https://docs.google.com/document/d/${docId}/edit`;
 
+  // SteamID берём из стартового сообщения топика — он нужен для сверки ID
+  let steamId = null;
+  try {
+    if (interaction.channel?.isThread?.()) {
+      const starter = await interaction.channel.fetchStarterMessage();
+      steamId = extractSteamId(starter?.content);
+    }
+  } catch (error) {
+    log.warn('Не удалось прочитать SteamID из топика:', error.message);
+  }
+
   await reviewAndReply({
     interaction,
     url,
+    steamId,
     sourceNote: 'кнопка «Перепроверить»',
     deletePrevious: interaction.message,
   });
 }
 
-async function reviewAndReply({ interaction, url, criteriaName, sourceNote, deletePrevious }) {
+async function reviewAndReply({ interaction, url, criteriaName, steamId, sourceNote, deletePrevious }) {
   const lockKey = `${interaction.guildId ?? 'dm'}:${url}`;
   if (inFlight.has(lockKey)) {
     await interaction.editReply({ content: 'Этот документ уже проверяется, подожди немного.' });
@@ -101,7 +114,7 @@ async function reviewAndReply({ interaction, url, criteriaName, sourceNote, dele
       await interaction.editReply({ content: `⏳ ${message}` }).catch(() => {});
     };
 
-    const result = await runReview({ docUrl: url, criteriaName, onProgress });
+    const result = await runReview({ docUrl: url, criteriaName, steamId, onProgress });
     const { report, doc, criteria, detResult, llm, llmError } = result;
 
     const row = new ActionRowBuilder().addComponents(

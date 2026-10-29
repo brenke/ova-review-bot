@@ -15,6 +15,7 @@ const SYSTEM_PROMPT = `Ты — старший проверяющий анкет
 Принципы:
 - Замечание уместно, если оно реально мешает игре, ломает лор или нарушает правило из чек-листа. Не придумывай придирок.
 - Текущую дату бери только из задания. Не полагайся на свои знания о «сегодня» и не считай прошедшие даты будущими.
+- Специализации ОВА не зависят от должности. КАД не требует КПД — КПД нужен только для прав категории C.
 - Критично: пустые обязательные разделы, прочерки вместо биографии, богмод и «суперспособности», копипаста шаблона или чужих анкет, нарушения лора, метагейминг в описании.
 - Важно: противоречия между разделами (возраст ↔ год рождения, должность ↔ опыт), отсутствие мотивации и слабостей, слишком общие формулировки («добрый, умный, смелый»).
 - Мелочь: опечатки, стиль, оформление.
@@ -53,7 +54,7 @@ export function todayRu() {
   return `${day}.${month}.${now.getUTCFullYear()}`;
 }
 
-export function buildMessages({ docText, criteria, detResult, docMeta, loreText }) {
+export function buildMessages({ docText, criteria, detResult, docMeta, loreText, steamId }) {
   const today = todayRu();
   const findings = detResult.findings.length
     ? detResult.findings
@@ -78,6 +79,7 @@ ${findings}
 
 ## Статистика документа
 Символов: ${detResult.stats.chars}, слов: ${detResult.stats.words}, разделов: ${detResult.stats.sectionCount}, полей: ${detResult.stats.fieldCount}, пустых полей: ${detResult.stats.placeholderFields}.
+${steamId ? `\n## Данные из сообщения с анкетой\nSteamID: ${steamId}. Последние 3 цифры — ${String(steamId).match(/(\d+)\s*$/)?.[1]?.slice(-3) ?? '—'}: столько же должно быть в поле «Идентификационный номер».\n` : ''}
 
 ## Найденные разделы
 ${sections}
@@ -108,12 +110,12 @@ function sleep(ms) {
 /**
  * @param {{docText: string, criteria: object, detResult: object, docMeta: object, model?: string}} input
  */
-export async function reviewWithLlm({ docText, criteria, detResult, docMeta, model, loreText }) {
+export async function reviewWithLlm({ docText, criteria, detResult, docMeta, model, loreText, steamId }) {
   if (!llmConfigured) return null;
 
   const url = `${config.llm.baseUrl}/chat/completions`;
   const modelName = model || criteria.config.model || config.llm.model;
-  const messages = buildMessages({ docText, criteria, detResult, docMeta, loreText });
+  const messages = buildMessages({ docText, criteria, detResult, docMeta, loreText, steamId });
 
   let useJsonMode = true;
   let lastError;
